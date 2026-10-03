@@ -1,41 +1,41 @@
-from datetime import datetime, timezone
-from pathlib import Path
+import os
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
+from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from langchain.tools import tool
 
 
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-# backend/
-BASE_DIR = Path(__file__).resolve().parents[2]
-
-TOKEN_FILE = BASE_DIR / "google_token.json"
+TOKEN_FILE = "token.json"
+CREDENTIALS_FILE = "credentials.json"
 
 
 def get_calendar_service():
     """Create and return an authenticated Google Calendar API service."""
 
-    if not TOKEN_FILE.exists():
-        raise RuntimeError(
-            "Google authorization required. Visit /auth/google first."
+    creds = None
+
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(
+            TOKEN_FILE,
+            SCOPES,
         )
 
-    creds = Credentials.from_authorized_user_file(
-        str(TOKEN_FILE),
-        SCOPES,
-    )
+    if not creds or not creds.valid:
+        if creds and creds.expired and creds.refresh_token:
+            creds.refresh(Request())
+        else:
+            flow = InstalledAppFlow.from_client_secrets_file(
+                CREDENTIALS_FILE,
+                SCOPES,
+            )
+            creds = flow.run_local_server(port=0)
 
-    if creds.expired and creds.refresh_token:
-        creds.refresh(Request())
-        
-
-    if not creds.valid:
-        raise RuntimeError(
-            "Google credentials are invalid. Visit /auth/google again."
-        )
+        with open(TOKEN_FILE, "w") as token:
+            token.write(creds.to_json())
 
     return build("calendar", "v3", credentials=creds)
 
@@ -137,7 +137,6 @@ def list_events(max_results: int = 10) -> str:
         maxResults=max_results,
         singleEvents=True,
         orderBy="startTime",
-        timeMin=datetime.now(timezone.utc).isoformat(),
     ).execute()
 
     events = events_result.get("items", [])
@@ -149,6 +148,7 @@ def list_events(max_results: int = 10) -> str:
 
     for event in events:
         start = event.get("start", {}).get("dateTime")
+
         if not start:
             start = event.get("start", {}).get("date")
 

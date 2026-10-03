@@ -233,3 +233,6 @@ backend/gmail_token.json
 __pycache__/
 
 backend/gmail_token.json
+backend/web_credentials.json
+backend/web_credentials.json
+backend/google_token.json
