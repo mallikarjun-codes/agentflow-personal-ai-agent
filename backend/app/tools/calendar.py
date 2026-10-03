@@ -1,37 +1,41 @@
-import os
+from datetime import datetime, timezone
+from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from langchain.tools import tool
 
+
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-TOKEN_FILE = "token.json"
-CREDENTIALS_FILE = "credentials.json"
+# backend/
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+TOKEN_FILE = BASE_DIR / "google_token.json"
 
 
 def get_calendar_service():
-    creds = None
+    """Create and return an authenticated Google Calendar API service."""
 
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(
-            TOKEN_FILE, SCOPES
+    if not TOKEN_FILE.exists():
+        raise RuntimeError(
+            "Google authorization required. Visit /auth/google first."
         )
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                CREDENTIALS_FILE,
-                SCOPES,
-            )
-            creds = flow.run_local_server(port=0)
+    creds = Credentials.from_authorized_user_file(
+        str(TOKEN_FILE),
+        SCOPES,
+    )
 
-        with open(TOKEN_FILE, "w") as token:
-            token.write(creds.to_json())
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        
+
+    if not creds.valid:
+        raise RuntimeError(
+            "Google credentials are invalid. Visit /auth/google again."
+        )
 
     return build("calendar", "v3", credentials=creds)
 
@@ -65,7 +69,8 @@ def create_event(
     ).execute()
 
     return (
-        f"Event created successfully. "
+        f"Event created successfully.\n"
+        f"Title: {created_event.get('summary', summary)}\n"
         f"Event ID: {created_event['id']}"
     )
 
@@ -101,7 +106,8 @@ def update_event(
     ).execute()
 
     return (
-        f"Event updated successfully. "
+        f"Event updated successfully.\n"
+        f"Title: {updated_event.get('summary', summary)}\n"
         f"Event ID: {updated_event['id']}"
     )
 
@@ -131,6 +137,7 @@ def list_events(max_results: int = 10) -> str:
         maxResults=max_results,
         singleEvents=True,
         orderBy="startTime",
+        timeMin=datetime.now(timezone.utc).isoformat(),
     ).execute()
 
     events = events_result.get("items", [])

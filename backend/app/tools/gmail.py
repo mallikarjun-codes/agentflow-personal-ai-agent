@@ -1,35 +1,42 @@
-import os
 import base64
 from email.message import EmailMessage
+from pathlib import Path
 
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from langchain.tools import tool
 
+
 SCOPES = ["https://www.googleapis.com/auth/gmail.send"]
-TOKEN_FILE = "gmail_token.json"
+
+# backend/
+BASE_DIR = Path(__file__).resolve().parents[2]
+
+TOKEN_FILE = BASE_DIR / "google_token.json"
 
 
 def get_gmail_service():
-    creds = None
+    """Create and return an authenticated Gmail API service."""
 
-    if os.path.exists(TOKEN_FILE):
-        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+    if not TOKEN_FILE.exists():
+        raise RuntimeError(
+            "Google authorization required. Visit /auth/google first."
+        )
 
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                "credentials.json",
-                SCOPES,
-            )
-            creds = flow.run_local_server(port=0)
+    creds = Credentials.from_authorized_user_file(
+        str(TOKEN_FILE),
+        SCOPES,
+    )
 
-        with open(TOKEN_FILE, "w") as token:
-            token.write(creds.to_json())
+    if creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+        
+
+    if not creds.valid:
+        raise RuntimeError(
+            "Google credentials are invalid. Visit /auth/google again."
+        )
 
     return build("gmail", "v1", credentials=creds)
 

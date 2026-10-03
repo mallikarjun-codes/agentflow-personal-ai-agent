@@ -1,10 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+from app.google_auth import router as google_auth_router
 
 from app.agent import agent
 
 app = FastAPI(title="AgentFlow")
+app.include_router(google_auth_router)
 
 app.add_middleware(
     CORSMiddleware,
