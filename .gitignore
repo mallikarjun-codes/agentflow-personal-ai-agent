@@ -224,3 +224,12 @@ credentials.json
 token.json
 .env
 __pycache__/
+
+backend/.venv/
+backend/.env
+backend/credentials.json
+backend/token.json
+backend/gmail_token.json
+__pycache__/
+
+backend/gmail_token.json
